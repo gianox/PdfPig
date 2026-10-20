@@ -1,5 +1,6 @@
 ﻿namespace UglyToad.PdfPig.Writer
 {
+    using Core;
     using System;
     using System.Collections.Generic;
     using System.IO;
@@ -42,7 +43,7 @@
             }
 
             offsets.Add(ir.Data, Stream.Position);
-            TokenWriter.WriteObject(ir.Data.ObjectNumber, ir.Data.Generation, contents, Stream);
+            TokenWriter.WriteObject(ir.Data.ObjectNumber, ir.Data.Generation, ContentsToWrite(ir.Data, token, contents), Stream);
 
             return ir;
         }
@@ -60,8 +61,21 @@
 
             hashes.Add(contents, indirectReference);
             offsets.Add(indirectReference.Data, Stream.Position);
-            TokenWriter.WriteObject(indirectReference.Data.ObjectNumber, indirectReference.Data.Generation, contents, Stream);
+            TokenWriter.WriteObject(indirectReference.Data.ObjectNumber, indirectReference.Data.Generation, ContentsToWrite(indirectReference.Data, token, contents), Stream);
             return indirectReference;
+        }
+
+        // Objects are compared in their plain form since encryption uses a random IV, so equal objects would never match.
+        private byte[] ContentsToWrite(IndirectReference reference, IToken token, byte[] plainContents)
+        {
+            if (!IsEncrypting)
+            {
+                return plainContents;
+            }
+
+            ms.SetLength(0);
+            TokenWriter.WriteToken(EncryptIfEnabled(reference, token), ms);
+            return ms.ToArray();
         }
 
         public new void Dispose()

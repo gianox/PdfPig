@@ -1,6 +1,7 @@
 ﻿namespace UglyToad.PdfPig.Writer
 {
     using Core;
+    using Encryption;
     using Graphics.Operations;
     using System;
     using System.Collections.Generic;
@@ -27,6 +28,13 @@
         public IReadOnlyList<byte[]> DocumentId { get; }
 
         public Stream Stream { get; protected set; }
+
+        /// <summary>
+        /// When set every object written has its strings and streams encrypted, except through <see cref="WriteUnencryptedToken"/>.
+        /// </summary>
+        internal ObjectEncryptor? Encryptor { get; set; }
+
+        private bool bypassEncryption;
 
         public bool AttemptDeduplication { get; set; } = true;
 
@@ -71,7 +79,7 @@
 
             var ir = ReserveObjectNumber();
             offsets.Add(ir.Data, Stream.Position);
-            var obj = new ObjectToken(XrefLocation.File(Stream.Position), ir.Data, token);
+            var obj = new ObjectToken(XrefLocation.File(Stream.Position), ir.Data, EncryptIfEnabled(ir.Data, token));
             TokenWriter.WriteToken(obj, Stream);
             return ir;
         }
@@ -84,9 +92,32 @@
             }
 
             offsets.Add(indirectReference.Data, Stream.Position);
-            var obj = new ObjectToken(XrefLocation.File(Stream.Position), indirectReference.Data, token);
+            var obj = new ObjectToken(XrefLocation.File(Stream.Position), indirectReference.Data, EncryptIfEnabled(indirectReference.Data, token));
             TokenWriter.WriteToken(obj, Stream);
             return indirectReference;
+        }
+
+        /// <summary>
+        /// Writes a token without encrypting it, used for the encryption dictionary itself.
+        /// </summary>
+        internal IndirectReferenceToken WriteUnencryptedToken(IToken token)
+        {
+            bypassEncryption = true;
+            try
+            {
+                return WriteToken(token);
+            }
+            finally
+            {
+                bypassEncryption = false;
+            }
+        }
+
+        protected bool IsEncrypting => Encryptor != null && !bypassEncryption;
+
+        protected IToken EncryptIfEnabled(IndirectReference reference, IToken token)
+        {
+            return IsEncrypting ? Encryptor!.Encrypt(reference, token) : token;
         }
 
         public IndirectReferenceToken ReserveObjectNumber()

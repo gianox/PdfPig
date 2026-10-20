@@ -4,6 +4,7 @@ namespace UglyToad.PdfPig.Writer
     using Actions;
     using Content;
     using Core;
+    using Encryption;
     using Fonts;
     using Graphics;
     using Logging;
@@ -34,6 +35,8 @@ namespace UglyToad.PdfPig.Writer
         private bool completed = false;
         private int fontId = 0;
         private double version = 1.7;
+        private bool isEncrypted;
+        private bool addAdobeExtensionLevel;
 
         private readonly static ArrayToken DefaultProcSet = new ArrayToken(new List<NameToken>
         {
@@ -121,6 +124,85 @@ namespace UglyToad.PdfPig.Writer
             }
 
             context.InitializePdf(version);
+        }
+
+        /// <summary>
+        /// Creates a document builder keeping resources in memory which writes a password protected document.
+        /// </summary>
+        /// <param name="encryption">The passwords and permissions of the document.</param>
+        /// <param name="version">Pdf version to use in header, at least 1.7.</param>
+        public PdfDocumentBuilder(PdfEncryptionOptions encryption, double version = 1.7)
+            : this(new MemoryStream(), encryption, true, PdfWriterType.Default, version)
+        {
+        }
+
+        /// <summary>
+        /// Creates a document builder using the supplied stream which writes a password protected document (AES-256).
+        /// Encryption has to be chosen here because objects are written to the stream as soon as they are added.
+        /// An empty <see cref="PdfEncryptionOptions.OwnerPassword"/> is replaced by a random password. Encryption can't be combined with
+        /// a <see cref="ArchiveStandard"/> other than <see cref="PdfAStandard.None"/>, <see cref="Build"/> throws in that case.
+        /// </summary>
+        /// <param name="stream">Steam to write pdf to.</param>
+        /// <param name="encryption">The passwords and permissions of the document.</param>
+        /// <param name="disposeStream">If stream should be disposed when builder is.</param>
+        /// <param name="type">Type of pdf stream writer to use</param>
+        /// <param name="version">Pdf version to use in header, at least 1.7.</param>
+        /// <param name="tokenWriter">Token writer to use, must be null or the <see cref="TokenWriter"/> class (or derive from it).</param>
+        public PdfDocumentBuilder(
+            Stream stream,
+            PdfEncryptionOptions encryption,
+            bool disposeStream = false,
+            PdfWriterType type = PdfWriterType.Default,
+            double version = 1.7,
+            ITokenWriter? tokenWriter = null)
+            : this(stream, disposeStream, type, ValidateEncryptionVersion(encryption, version), tokenWriter)
+        {
+            var ownerPassword = encryption.OwnerPassword;
+            if (string.IsNullOrEmpty(ownerPassword))
+            {
+                using (var random = System.Security.Cryptography.RandomNumberGenerator.Create())
+                {
+                    var bytes = new byte[16];
+                    random.GetBytes(bytes);
+                    ownerPassword = BitConverter.ToString(bytes).Replace("-", string.Empty);
+                }
+            }
+
+            var handler = StandardSecurityHandlerBuilder.CreateR6(
+                encryption.UserPassword ?? string.Empty,
+                ownerPassword,
+                encryption.Permissions,
+                encryption.EncryptMetadata);
+
+            try
+            {
+                ((PdfStreamWriter)context).EnableEncryption(handler);
+            }
+            catch
+            {
+                context.Dispose();
+                throw;
+            }
+
+            isEncrypted = true;
+
+            // AES-256 belongs to PDF 2.0. With an older header Acrobat expects this extension entry instead.
+            addAdobeExtensionLevel = version < 2.0;
+        }
+
+        private static double ValidateEncryptionVersion(PdfEncryptionOptions encryption, double version)
+        {
+            if (encryption is null)
+            {
+                throw new ArgumentNullException(nameof(encryption));
+            }
+
+            if (version < 1.7)
+            {
+                throw new ArgumentOutOfRangeException(nameof(version), version, "AES-256 encryption requires a PDF version of at least 1.7.");
+            }
+
+            return version;
         }
 
         /// <summary>
@@ -806,6 +888,11 @@ namespace UglyToad.PdfPig.Writer
 
         private void CompleteDocument()
         {
+            if (isEncrypted && ArchiveStandard != PdfAStandard.None)
+            {
+                throw new InvalidOperationException($"PDF/A {ArchiveStandard} forbids encryption, remove the encryption options or set {nameof(ArchiveStandard)} to {nameof(PdfAStandard.None)}.");
+            }
+
             // write fonts to reserved object numbers
             foreach (var font in fonts)
             {
@@ -923,6 +1010,20 @@ namespace UglyToad.PdfPig.Writer
             {
                 var rootPageInfo = CreatePageTree(leafs, null);
                 catalogDictionary[NameToken.Pages] = rootPageInfo.Ref;
+            }
+
+            if (addAdobeExtensionLevel)
+            {
+                catalogDictionary[NameToken.Create("Extensions")] = new DictionaryToken(new Dictionary<NameToken, IToken>
+                {
+                    {
+                        NameToken.Create("ADBE"), new DictionaryToken(new Dictionary<NameToken, IToken>
+                        {
+                            { NameToken.Create("BaseVersion"), NameToken.Create("1.7") },
+                            { NameToken.Create("ExtensionLevel"), new NumericToken(8) }
+                        })
+                    }
+                });
             }
 
             if (Bookmarks != null && Bookmarks.Roots.Count > 0)
@@ -1420,12 +1521,18 @@ namespace UglyToad.PdfPig.Writer
         /// </summary>
         public void Dispose()
         {
-            if (!completed)
+            try
             {
-                CompleteDocument();
+                // An invalid combination was already reported by Build, don't throw again from Dispose.
+                if (!completed && !(isEncrypted && ArchiveStandard != PdfAStandard.None))
+                {
+                    CompleteDocument();
+                }
             }
-
-            context.Dispose();
+            finally
+            {
+                context.Dispose();
+            }
         }
 
         /// <summary>

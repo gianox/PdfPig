@@ -57,7 +57,12 @@
             TokenWriter.WriteToken(token, ms);
             var contents = ms.ToArray();
 
-            hashes.Add(contents, indirectReference);
+            // The same contents can legitimately be written to several reserved references, the first one stays the dedup target.
+            if (!hashes.ContainsKey(contents))
+            {
+                hashes.Add(contents, indirectReference);
+            }
+
             offsets.Add(indirectReference.Data, Stream.Position);
             TokenWriter.WriteObject(indirectReference.Data.ObjectNumber, indirectReference.Data.Generation, contents, Stream);
             return indirectReference;

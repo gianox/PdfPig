@@ -225,7 +225,7 @@ namespace UglyToad.PdfPig.Encryption
         {
             // Test the password against the user key by computing the SHA-256 hash of the UTF-8 password concatenated with the 8 bytes of User Validation Salt.
             // If the 32-byte result matches the first 32 bytes of the U string, this is the user password
-            var truncatedPassword = TruncatePasswordTo127Bytes(passwordBytes);
+            var truncatedPassword = StandardSecurityHandlerAlgorithms.TruncatePasswordTo127Bytes(passwordBytes);
 
             // The 48-byte string consisting of the 32-byte hash followed by the User Validation Salt followed by the User Key Salt is stored as the U key
             var userPasswordHash = new byte[32];
@@ -236,11 +236,11 @@ namespace UglyToad.PdfPig.Encryption
             byte[] result;
             if (encryptionDictionary.Revision == 6)
             {
-                result = ComputeStupidIsoHash(truncatedPassword, userValidationSalt, null);
+                result = StandardSecurityHandlerAlgorithms.ComputeStupidIsoHash(truncatedPassword, userValidationSalt, null);
             }
             else
             {
-                result = ComputeSha256Hash(truncatedPassword, userValidationSalt);
+                result = StandardSecurityHandlerAlgorithms.ComputeSha256Hash(truncatedPassword, userValidationSalt);
             }
 
             return result.SequenceEqual(userPasswordHash);
@@ -320,7 +320,7 @@ namespace UglyToad.PdfPig.Encryption
             // Test the password against the user key by computing the SHA-256 hash of the UTF-8 password concatenated with the 8 bytes of Owner Validation Salt and the 48 byte  U string.
             // If the 32 byte result matches the first 32 bytes of the O string, this is the user password.
 
-            var truncatedPassword = TruncatePasswordTo127Bytes(passwordBytes);
+            var truncatedPassword = StandardSecurityHandlerAlgorithms.TruncatePasswordTo127Bytes(passwordBytes);
 
             // The 48-byte string consisting of the 32-byte hash followed by the Owner Validation Salt followed by the Owner Key Salt is stored as the O key.
             var ownerHash = new byte[32];
@@ -331,11 +331,11 @@ namespace UglyToad.PdfPig.Encryption
             byte[] result;
             if (encryptionDictionary.Revision == 6)
             {
-                result = ComputeStupidIsoHash(truncatedPassword, validationSalt, encryptionDictionary.UserBytes);
+                result = StandardSecurityHandlerAlgorithms.ComputeStupidIsoHash(truncatedPassword, validationSalt, encryptionDictionary.UserBytes);
             }
             else
             {
-                result = ComputeSha256Hash(truncatedPassword, validationSalt, encryptionDictionary.UserBytes);
+                result = StandardSecurityHandlerAlgorithms.ComputeSha256Hash(truncatedPassword, validationSalt, encryptionDictionary.UserBytes);
             }
 
             return result.SequenceEqual(ownerHash);
@@ -645,7 +645,7 @@ namespace UglyToad.PdfPig.Encryption
         private static byte[] CalculateKeyRevisions5And6(byte[] password, EncryptionDictionary encryptionDictionary, bool isUserPassword)
         {
             // Truncate the UTF-8 representation of the password to 127 bytes if it is longer than 127 bytes
-            password = TruncatePasswordTo127Bytes(password);
+            password = StandardSecurityHandlerAlgorithms.TruncatePasswordTo127Bytes(password);
 
             byte[] intermediateKey;
             byte[] encryptedFileKey;
@@ -660,11 +660,11 @@ namespace UglyToad.PdfPig.Encryption
 
                 if (encryptionDictionary.Revision == 6)
                 {
-                    intermediateKey = ComputeStupidIsoHash(password, ownerKeySalt, encryptionDictionary.UserBytes!);
+                    intermediateKey = StandardSecurityHandlerAlgorithms.ComputeStupidIsoHash(password, ownerKeySalt, encryptionDictionary.UserBytes!);
                 }
                 else
                 {
-                    intermediateKey = ComputeSha256Hash(password, ownerKeySalt, encryptionDictionary.UserBytes!);
+                    intermediateKey = StandardSecurityHandlerAlgorithms.ComputeSha256Hash(password, ownerKeySalt, encryptionDictionary.UserBytes!);
                 }
 
                 encryptedFileKey = encryptionDictionary.OwnerEncryptionBytes!;
@@ -680,11 +680,11 @@ namespace UglyToad.PdfPig.Encryption
 
                 if (encryptionDictionary.Revision == 6)
                 {
-                    intermediateKey = ComputeStupidIsoHash(password, userKeySalt, null);
+                    intermediateKey = StandardSecurityHandlerAlgorithms.ComputeStupidIsoHash(password, userKeySalt, null);
                 }
                 else
                 {
-                    intermediateKey = ComputeSha256Hash(password, userKeySalt);
+                    intermediateKey = StandardSecurityHandlerAlgorithms.ComputeSha256Hash(password, userKeySalt);
                 }
 
                 encryptedFileKey = encryptionDictionary.UserEncryptionBytes;
@@ -710,26 +710,6 @@ namespace UglyToad.PdfPig.Encryption
 
                     return result;
                 }
-            }
-        }
-
-        private static byte[] ComputeSha256Hash(byte[] input1, byte[] input2, byte[] input3 = null)
-        {
-            using (var sha = SHA256.Create())
-            {
-                sha.TransformBlock(input1, 0, input1.Length, null, 0);
-                sha.TransformBlock(input2, 0, input2.Length, null, 0);
-
-                if (input3 != null)
-                {
-                    sha.TransformFinalBlock(input3, 0, input3.Length);
-                }
-                else
-                {
-                    sha.TransformFinalBlock([], 0, 0);
-                }
-
-                return sha.Hash;
             }
         }
 
@@ -759,119 +739,6 @@ namespace UglyToad.PdfPig.Encryption
             }
 
             return result;
-        }
-
-        private static byte[] TruncatePasswordTo127Bytes(byte[] password)
-        {
-            if (password.Length <= 127)
-            {
-                return password;
-            }
-
-            var result = new byte[127];
-            Array.Copy(password, result, 127);
-            return result;
-        }
-
-        /// <summary>
-        /// This is the revision 6 algorithm the specification for which can't be viewed unless you pay the ISO a lot of money (which makes me extremely angry).
-        /// This is an attempt to port directly from PDFBox code.
-        /// </summary>
-        /// <param name="password">The truncated user or owner password.</param>
-        /// <param name="salt">The 8 byte user or owner key validation salt.</param>
-        /// <param name="vector">Used when hashing owner password in which case it is the 48 byte /U key.</param>
-        private static byte[] ComputeStupidIsoHash(byte[] password, byte[] salt, byte[] vector)
-        {
-            // There are some details here https://web.archive.org/web/20180311160224/esec-lab.sogeti.com/posts/2011/09/14/the-undocumented-password-validation-algorithm-of-adobe-reader-x.html
-            if (vector is null)
-            {
-                vector = [];
-            }
-            else if (vector.Length > 0 && vector.Length < 48)
-            {
-                throw new PdfDocumentEncryptedException($"Vector for revision 6 owner password check (/U) is the wrong length, expected 48 bytes got {vector.Length} bytes.");
-            }
-            else if (vector.Length > 48)
-            {
-                var temp = new byte[48];
-                Array.Copy(vector, temp, temp.Length);
-                vector = temp;
-            }
-
-            password = TruncatePasswordTo127Bytes(password);
-
-            byte[] input;
-            using (var sha256 = SHA256.Create())
-            {
-                sha256.TransformBlock(password, 0, password.Length, null, 0);
-                sha256.TransformBlock(salt, 0, salt.Length, null, 0);
-                sha256.TransformBlock(vector, 0, vector.Length, null, 0);
-                sha256.TransformFinalBlock([], 0, 0);
-                input = sha256.Hash;
-            }
-
-            var key = new byte[16];
-            Array.Copy(input, key, 16);
-
-            var iv = new byte[16];
-            Array.Copy(input, 16, iv, 0, iv.Length);
-
-            byte[] x = null;
-            var i = 0;
-            while (i < 64 || i < x[x.Length - 1] + 32)
-            {
-                var roundResult = new byte[64 * (password.Length + input.Length + vector.Length)];
-
-                var position = 0;
-                for (var j = 0; j < 64; j++)
-                {
-                    Array.Copy(password, 0, roundResult, position, password.Length);
-                    position += password.Length;
-                    Array.Copy(input, 0, roundResult, position, input.Length);
-                    position += input.Length;
-                    if (vector.Length > 0)
-                    {
-                        Array.Copy(vector, 0, roundResult, position, vector.Length);
-                        position += vector.Length;
-                    }
-                }
-
-                using (var aes = Aes.Create())
-                {
-                    aes.Key = key;
-                    aes.IV = iv;
-                    aes.Mode = CipherMode.CBC;
-                    aes.Padding = PaddingMode.None;
-
-                    using (var decryptor = aes.CreateEncryptor())
-                    {
-                        x = decryptor.TransformFinalBlock(roundResult, 0, roundResult.Length);
-                    }
-                }
-
-                var sumOfFirstSixteenBytesOfX = x.Take(16).Sum(v => (long)v);
-                var mod3 = sumOfFirstSixteenBytesOfX % 3;
-                HashAlgorithm nextHash = mod3 switch {
-                    0 => SHA256.Create(),
-                    1 => SHA384.Create(),
-                    2 => SHA512.Create(),
-                    _ => throw new PdfDocumentEncryptedException("Invalid remainder from summing first sixteen bytes of this round's hash.")
-                };
-                input = nextHash.ComputeHash(x);
-                Array.Copy(input, key, 16);
-                Array.Copy(input, 16, iv, 0, 16);
-
-                i++;
-            }
-
-            if (input.Length > 32)
-            {
-                var result = new byte[32];
-                Array.Copy(input, result, result.Length);
-                return result;
-            }
-
-            return input;
         }
     }
 }

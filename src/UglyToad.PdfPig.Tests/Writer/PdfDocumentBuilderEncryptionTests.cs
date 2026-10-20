@@ -133,10 +133,22 @@ namespace UglyToad.PdfPig.Tests.Writer
         public void PdfAForbidsEncryption()
         {
             using var builder = new PdfDocumentBuilder(new MemoryStream(), new PdfEncryptionOptions { OwnerPassword = "admin" }, true);
-            builder.ArchiveStandard = PdfAStandard.A2B;
-            builder.AddPage(PageSize.A4);
 
-            Assert.Throws<InvalidOperationException>(() => builder.Build());
+            Assert.Throws<InvalidOperationException>(() => builder.ArchiveStandard = PdfAStandard.A2B);
+            Assert.Equal(PdfAStandard.None, builder.ArchiveStandard);
+
+            builder.ArchiveStandard = PdfAStandard.None;
+            builder.AddPage(PageSize.A4);
+            Assert.NotEmpty(builder.Build());
+        }
+
+        [Fact]
+        public void PdfAIsStillAvailableWithoutEncryption()
+        {
+            using var builder = new PdfDocumentBuilder();
+            builder.ArchiveStandard = PdfAStandard.A2B;
+
+            Assert.Equal(PdfAStandard.A2B, builder.ArchiveStandard);
         }
 
         [Fact]

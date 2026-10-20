@@ -49,8 +49,24 @@ namespace UglyToad.PdfPig.Writer
 
         /// <summary>
         /// The standard of PDF/A compliance of the generated document. Defaults to <see cref="PdfAStandard.None"/>.
+        /// PDF/A forbids encryption, so setting a standard other than <see cref="PdfAStandard.None"/> throws
+        /// an <see cref="InvalidOperationException"/> for a builder created with <see cref="PdfEncryptionOptions"/>.
         /// </summary>
-        public PdfAStandard ArchiveStandard { get; set; } = PdfAStandard.None;
+        public PdfAStandard ArchiveStandard
+        {
+            get => archiveStandard;
+            set
+            {
+                if (isEncrypted && value != PdfAStandard.None)
+                {
+                    throw new InvalidOperationException($"PDF/A {value} forbids encryption, create the builder without {nameof(PdfEncryptionOptions)} to use it.");
+                }
+
+                archiveStandard = value;
+            }
+        }
+
+        private PdfAStandard archiveStandard = PdfAStandard.None;
 
         /// <summary>
         /// Whether to include the document information dictionary in the produced document.

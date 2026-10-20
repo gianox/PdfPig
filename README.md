@@ -241,6 +241,43 @@ Which take RGB values between 0 and 255. The color will remain active for all op
 
 Which resets the color for stroke, fill and text drawing to black.
 
+### Create an encrypted PDF
+
+Pass `PdfEncryptionOptions` to the `PdfDocumentBuilder` to write a password protected document:
+
+```cs
+var options = new PdfEncryptionOptions
+{
+    UserPassword = "open-me",      // needed to open the document, empty means anyone can open it
+    OwnerPassword = "admin",       // full access; empty means a random password nobody knows
+    Permissions = PdfPermissions.All & ~(PdfPermissions.Print | PdfPermissions.CopyContent)
+};
+
+using (var builder = new PdfDocumentBuilder(options))
+{
+    var page = builder.AddPage(PageSize.A4);
+    var font = builder.AddStandard14Font(Standard14Font.Helvetica);
+    page.AddText("Secret", 12, new PdfPoint(25, 700), font);
+
+    File.WriteAllBytes(@"C:\pdfs\secret.pdf", builder.Build());
+}
+
+// Open it again with either password.
+using (var document = PdfDocument.Open(@"C:\pdfs\secret.pdf", new ParsingOptions { Password = "open-me" }))
+{
+}
+```
+
+Notes:
+
+- Documents are encrypted with AES-256 (revision 6 of the standard security handler, ISO 32000-2). There is no option for weaker algorithms such as RC4 or AES-128.
+- A PDF version below 1.7 is raised to 1.7. Unless the version is 2.0 the Adobe extension level 8 entry is written so that Acrobat and other viewers recognise the encryption.
+- Permissions are only honoured by well behaved viewers and are **not real protection** unless a user password is also required: without one anyone can open the file and remove the restrictions.
+- PDF/A forbids encryption, so setting `ArchiveStandard` on an encrypting builder throws.
+- Pages copied from an encrypted document are written in clear text (or with the new encryption), but the caller must open the source with its password, for example `PdfDocument.Open(path, new ParsingOptions { Password = "..." })`.
+- `EncryptMetadata` only affects copied `/Metadata` streams: the builder writes XMP metadata only for PDF/A, which can't be combined with encryption.
+- Custom `ITokenWriter` implementations can't be combined with encryption.
+
 ### Document Information
 
 The `PdfDocument` provides access to the document metadata as `DocumentInformation` defined in the PDF file. These tend not to be provided therefore most of these entries will be `null`:
@@ -395,6 +432,14 @@ You can merge 2 or more existing PDF files using the `PdfMerger` class:
 ```cs
 var resultFileBytes = PdfMerger.Merge(filePath1, filePath2);
 File.WriteAllBytes(@"C:\pdfs\outputfilename.pdf", resultFileBytes);
+```
+
+To write the merged document password protected, pass `PdfEncryptionOptions` first (the sources must open without a password):
+
+```cs
+var encrypted = PdfMerger.Merge(
+    new PdfEncryptionOptions { UserPassword = "open-me", OwnerPassword = "admin" },
+    new[] { File.ReadAllBytes(filePath1), File.ReadAllBytes(filePath2) });
 ```
 
 ## Wiki

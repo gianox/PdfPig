@@ -21,6 +21,11 @@
         protected int CurrentNumber { get; set; } = 1;
         protected readonly ITokenWriter TokenWriter;
 
+        /// <summary>
+        /// The two parts of the trailer <c>/ID</c>, fixed when the writer is created.
+        /// </summary>
+        public IReadOnlyList<byte[]> DocumentId { get; }
+
         public Stream Stream { get; protected set; }
 
         public bool AttemptDeduplication { get; set; } = true;
@@ -35,7 +40,8 @@
             Stream baseStream,
             bool disposeStream = true,
             ITokenWriter? tokenWriter = null,
-            Action<double>? recordVersion = null)
+            Action<double>? recordVersion = null,
+            IReadOnlyList<byte[]>? documentId = null)
         {
             Stream = baseStream ?? throw new ArgumentNullException(nameof(baseStream));
 
@@ -47,6 +53,13 @@
             this.recordVersion = recordVersion;
             DisposeStream = disposeStream;
             TokenWriter = tokenWriter ?? new TokenWriter();
+
+            if (documentId != null && documentId.Count != 2)
+            {
+                throw new ArgumentException("The document identifier must consist of exactly two parts.", nameof(documentId));
+            }
+
+            DocumentId = documentId ?? DocumentIdentifier.Create();
         }
 
         public virtual IndirectReferenceToken WriteToken(IToken token)
@@ -95,7 +108,14 @@
 
         public void CompletePdf(IndirectReferenceToken catalogReference, IndirectReferenceToken? documentInformationReference = null)
         {
-            TokenWriter.WriteCrossReferenceTable(offsets, catalogReference.Data, Stream, documentInformationReference?.Data, null);
+            if (TokenWriter is ITrailerTokenWriter trailerWriter)
+            {
+                trailerWriter.WriteCrossReferenceTable(offsets, catalogReference.Data, Stream, documentInformationReference?.Data, null, DocumentId);
+            }
+            else
+            {
+                TokenWriter.WriteCrossReferenceTable(offsets, catalogReference.Data, Stream, documentInformationReference?.Data, null);
+            }
         }
 
         public void Dispose()

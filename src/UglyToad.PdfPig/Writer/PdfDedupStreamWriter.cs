@@ -13,8 +13,9 @@
             Stream stream,
             bool dispose,
             ITokenWriter? tokenWriter = null,
-            Action<double>? recordVersion = null
-            ) : base(stream, dispose, tokenWriter, recordVersion)
+            Action<double>? recordVersion = null,
+            IReadOnlyList<byte[]>? documentId = null
+            ) : base(stream, dispose, tokenWriter, recordVersion, documentId)
         {
         }
 

@@ -16,7 +16,7 @@
     /// <summary>
     /// Writes any type of <see cref="IToken"/> to the corresponding PDF document format output.
     /// </summary>
-    public class TokenWriter : ITokenWriter
+    public class TokenWriter : ITokenWriter, ITrailerTokenWriter
     {
         private const byte ArrayStart = (byte)'[';
         private const byte ArrayEnd = (byte)']';
@@ -151,6 +151,28 @@
             IndirectReference? documentInformationReference,
             long? prevXrefTableLocation)
         {
+            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevXrefTableLocation, DocumentIdentifier.Create());
+        }
+
+        void ITrailerTokenWriter.WriteCrossReferenceTable(
+            IReadOnlyDictionary<IndirectReference, long> objectOffsets,
+            IndirectReference catalogToken,
+            Stream outputStream,
+            IndirectReference? documentInformationReference,
+            long? prevTableLocation,
+            IReadOnlyList<byte[]> documentId)
+        {
+            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevTableLocation, documentId);
+        }
+
+        private void WriteCrossReferenceTable(
+            IReadOnlyDictionary<IndirectReference, long> objectOffsets,
+            IndirectReference catalogToken,
+            Stream outputStream,
+            IndirectReference? documentInformationReference,
+            long? prevXrefTableLocation,
+            IReadOnlyList<byte[]> documentId)
+        {
             if (objectOffsets.Count == 0)
             {
                 throw new InvalidOperationException("Could not write empty cross reference table.");
@@ -248,8 +270,8 @@
 
             var identifier = new ArrayToken(new IToken[]
             {
-                new HexToken(Guid.NewGuid().ToString("N").AsSpan()),
-                new HexToken(Guid.NewGuid().ToString("N").AsSpan())
+                DocumentIdentifier.ToToken(documentId[0]),
+                DocumentIdentifier.ToToken(documentId[1])
             });
 
             var trailerDictionaryData = new Dictionary<NameToken, IToken>

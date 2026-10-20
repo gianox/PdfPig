@@ -74,8 +74,9 @@ namespace UglyToad.PdfPig.Tests.Encryption
             var result = StandardSecurityHandlerBuilder.CreateR6(composed, longPassword, PdfPermissions.None, true);
 
             Assert.Equal(StandardSecurityHandlerBuilder.PreparePassword(composed), StandardSecurityHandlerBuilder.PreparePassword(decomposed));
-            // The read side does not normalize, so it only accepts the composed spelling.
+            // The read side normalizes too, so either spelling opens the document.
             AssertHandlerUsesKey(OpenWith(result.EncryptionDictionary, composed), result.FileKey);
+            AssertHandlerUsesKey(OpenWith(result.EncryptionDictionary, decomposed), result.FileKey);
             // Only the first 127 bytes count.
             AssertHandlerUsesKey(OpenWith(result.EncryptionDictionary, new string('x', 127) + "ignored"), result.FileKey);
         }

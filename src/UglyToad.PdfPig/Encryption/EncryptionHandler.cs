@@ -119,10 +119,25 @@ namespace UglyToad.PdfPig.Encryption
 
             var foundPassword = false;
 
+            var passwordCandidates = new List<byte[]>();
             foreach (var password in passwords)
             {
-                var passwordBytes = charset.GetBytes(password);
+                if (encryptionDictionary.Revision == 5 || encryptionDictionary.Revision == 6)
+                {
+                    // The specification asks for the password to be prepared with SASLprep, tools that do so write
+                    // the normalized form. Others use the characters as typed, so try both.
+                    var normalized = password.Normalize(NormalizationForm.FormKC);
+                    if (!string.Equals(normalized, password, StringComparison.Ordinal))
+                    {
+                        passwordCandidates.Add(charset.GetBytes(normalized));
+                    }
+                }
 
+                passwordCandidates.Add(charset.GetBytes(password));
+            }
+
+            foreach (var passwordBytes in passwordCandidates)
+            {
                 var isUserPassword = false;
                 byte[] decryptionPasswordBytes;
 

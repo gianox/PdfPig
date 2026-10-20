@@ -130,7 +130,7 @@ namespace UglyToad.PdfPig.Writer
         /// Creates a document builder keeping resources in memory which writes a password protected document.
         /// </summary>
         /// <param name="encryption">The passwords and permissions of the document.</param>
-        /// <param name="version">Pdf version to use in header, at least 1.7.</param>
+        /// <param name="version">Pdf version to use in header. AES-256 needs at least 1.7, a lower version is raised to 1.7.</param>
         public PdfDocumentBuilder(PdfEncryptionOptions encryption, double version = 1.7)
             : this(new MemoryStream(), encryption, true, PdfWriterType.Default, version)
         {
@@ -146,7 +146,7 @@ namespace UglyToad.PdfPig.Writer
         /// <param name="encryption">The passwords and permissions of the document.</param>
         /// <param name="disposeStream">If stream should be disposed when builder is.</param>
         /// <param name="type">Type of pdf stream writer to use</param>
-        /// <param name="version">Pdf version to use in header, at least 1.7.</param>
+        /// <param name="version">Pdf version to use in header. AES-256 needs at least 1.7, a lower version is raised to 1.7.</param>
         /// <param name="tokenWriter">Token writer to use, must be null or the <see cref="TokenWriter"/> class (or derive from it).</param>
         public PdfDocumentBuilder(
             Stream stream,
@@ -197,12 +197,8 @@ namespace UglyToad.PdfPig.Writer
                 throw new ArgumentNullException(nameof(encryption));
             }
 
-            if (version < 1.7)
-            {
-                throw new ArgumentOutOfRangeException(nameof(version), version, "AES-256 encryption requires a PDF version of at least 1.7.");
-            }
-
-            return version;
+            // AES-256 needs PDF 1.7 (with the Adobe extension) or later, so an older requested version is raised.
+            return Math.Max(version, 1.7);
         }
 
         /// <summary>

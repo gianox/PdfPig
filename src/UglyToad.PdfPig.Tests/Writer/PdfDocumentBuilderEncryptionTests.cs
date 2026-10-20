@@ -112,9 +112,15 @@ namespace UglyToad.PdfPig.Tests.Writer
         }
 
         [Fact]
-        public void VersionBelow17IsRejected()
+        public void VersionBelow17IsRaisedTo17()
         {
-            Assert.Throws<ArgumentOutOfRangeException>(() => new PdfDocumentBuilder(new MemoryStream(), new PdfEncryptionOptions(), true, version: 1.4));
+            var bytes = BuildDocument(new PdfEncryptionOptions { OwnerPassword = "admin" }, version: 1.4);
+
+            var text = Encoding.GetEncoding("iso-8859-1").GetString(bytes);
+            Assert.StartsWith("%PDF-1.7", text);
+            Assert.Contains("/ExtensionLevel 8", text);
+            using var document = PdfDocument.Open(bytes, new ParsingOptions { UseLenientParsing = false });
+            Assert.Equal(1, document.NumberOfPages);
         }
 
         [Fact]

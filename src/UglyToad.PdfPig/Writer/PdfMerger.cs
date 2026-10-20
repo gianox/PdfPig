@@ -181,6 +181,86 @@ public static class PdfMerger
         }
     }
     
+    /// <summary>
+    /// Merge the set of PDF documents into a single password protected document.
+    /// PDF/A output is not available as PDF/A forbids encryption. The source documents must be openable without a password.
+    /// </summary>
+    /// <param name="encryption">How the merged document is encrypted. See <see cref="PdfEncryptionOptions"/>.</param>
+    /// <param name="files">The bytes of the documents to merge, in order.</param>
+    /// <param name="pagesBundle">Optionally the page numbers to take from each document.</param>
+    /// <param name="docInfoBuilder">Optionally the document information for the merged document.</param>
+    public static byte[] Merge(
+        PdfEncryptionOptions encryption,
+        IReadOnlyList<byte[]> files,
+        IReadOnlyList<IReadOnlyList<int>>? pagesBundle = null,
+        PdfDocumentBuilder.DocumentInformationBuilder? docInfoBuilder = null)
+    {
+        _ = encryption ?? throw new ArgumentNullException(nameof(encryption));
+        _ = files ?? throw new ArgumentNullException(nameof(files));
+
+        var documents = new List<PdfDocument>(files.Count);
+        try
+        {
+            foreach (var file in files)
+            {
+                documents.Add(PdfDocument.Open(file));
+            }
+
+            using (var output = new MemoryStream())
+            {
+                Merge(documents, output, pagesBundle, PdfAStandard.None, docInfoBuilder, encryption);
+                return output.ToArray();
+            }
+        }
+        finally
+        {
+            foreach (var document in documents)
+            {
+                document.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Merge the set of PDF documents into a single password protected document written to the output stream.
+    /// The caller must manage disposing the stream. PDF/A output is not available as PDF/A forbids encryption.
+    /// The source documents must be openable without a password.
+    /// </summary>
+    /// <param name="encryption">How the merged document is encrypted. See <see cref="PdfEncryptionOptions"/>.</param>
+    /// <param name="streams">A list of streams for the files contents, this must support reading and seeking.</param>
+    /// <param name="output">Must be writable.</param>
+    /// <param name="pagesBundle">Optionally the page numbers to take from each document.</param>
+    /// <param name="docInfoBuilder">Optionally the document information for the merged document.</param>
+    public static void Merge(
+        PdfEncryptionOptions encryption,
+        IReadOnlyList<Stream> streams,
+        Stream output,
+        IReadOnlyList<IReadOnlyList<int>?>? pagesBundle = null,
+        PdfDocumentBuilder.DocumentInformationBuilder? docInfoBuilder = null)
+    {
+        _ = encryption ?? throw new ArgumentNullException(nameof(encryption));
+        _ = streams ?? throw new ArgumentNullException(nameof(streams));
+        _ = output ?? throw new ArgumentNullException(nameof(output));
+
+        var documents = new List<PdfDocument>(streams.Count);
+        try
+        {
+            foreach (var stream in streams)
+            {
+                documents.Add(PdfDocument.Open(stream));
+            }
+
+            Merge(documents, output, pagesBundle, PdfAStandard.None, docInfoBuilder, encryption);
+        }
+        finally
+        {
+            foreach (var document in documents)
+            {
+                document.Dispose();
+            }
+        }
+    }
+
     private static FileStream OpenReadShared(string path)
     {
         return new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite | FileShare.Delete);
@@ -191,10 +271,13 @@ public static class PdfMerger
         Stream output,
         IReadOnlyList<IReadOnlyList<int>?>? pagesBundle,
         PdfAStandard archiveStandard = PdfAStandard.None,
-        PdfDocumentBuilder.DocumentInformationBuilder? docInfoBuilder = null)
+        PdfDocumentBuilder.DocumentInformationBuilder? docInfoBuilder = null,
+        PdfEncryptionOptions? encryption = null)
     {
         var maxVersion = files.Select(x => x.Version).Max();
-        using (var document = new PdfDocumentBuilder(output, false, PdfWriterType.Default, maxVersion))
+        using (var document = encryption is null
+                   ? new PdfDocumentBuilder(output, false, PdfWriterType.Default, maxVersion)
+                   : new PdfDocumentBuilder(output, encryption, false, PdfWriterType.Default, maxVersion))
         {
             document.ArchiveStandard = archiveStandard;
             if (docInfoBuilder != null) 

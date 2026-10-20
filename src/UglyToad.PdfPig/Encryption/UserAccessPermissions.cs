@@ -46,6 +46,6 @@
         /// When this is clear (and <see cref="Print"/> is set), printing is limited to a low-level representation of the appearance,
         /// possibly of degraded quality. 
         /// </summary>
-        PrintHighQuality = 1 << 12
+        PrintHighQuality = 1 << 11
     }
 }

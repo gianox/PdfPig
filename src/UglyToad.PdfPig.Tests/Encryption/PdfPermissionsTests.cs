@@ -46,5 +46,20 @@ namespace UglyToad.PdfPig.Tests.Encryption
 
             Assert.Equal(PdfPermissions.None.ToPValue(), p);
         }
+
+        [Fact]
+        public void ReadSideFlagsMatchTheSpecificationBits()
+        {
+            Assert.Equal((long)PdfPermissions.Print, (long)UserAccessPermissions.Print);
+            Assert.Equal((long)PdfPermissions.Modify, (long)UserAccessPermissions.Modify);
+            Assert.Equal((long)PdfPermissions.CopyContent, (long)UserAccessPermissions.CopyTextAndGraphics);
+            Assert.Equal((long)PdfPermissions.ModifyAnnotations, (long)UserAccessPermissions.AddOrModifyTextAnnotationsAndFillFormFields);
+            Assert.Equal((long)PdfPermissions.FillForms, (long)UserAccessPermissions.FillExistingFormFields);
+            Assert.Equal((long)PdfPermissions.ExtractForAccessibility, (long)UserAccessPermissions.ExtractTextAndGraphics);
+            Assert.Equal((long)PdfPermissions.Assemble, (long)UserAccessPermissions.AssembleDocument);
+            // Bit 12, not bit 13.
+            Assert.Equal(2048L, (long)UserAccessPermissions.PrintHighQuality);
+            Assert.Equal((long)PdfPermissions.PrintHighQuality, (long)UserAccessPermissions.PrintHighQuality);
+        }
     }
 }

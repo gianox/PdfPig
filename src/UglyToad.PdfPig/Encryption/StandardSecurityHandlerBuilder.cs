@@ -13,10 +13,11 @@ namespace UglyToad.PdfPig.Encryption
     /// </summary>
     internal sealed class StandardSecurityHandlerResult
     {
-        public StandardSecurityHandlerResult(byte[] fileKey, DictionaryToken encryptionDictionary)
+        public StandardSecurityHandlerResult(byte[] fileKey, DictionaryToken encryptionDictionary, bool encryptMetadata)
         {
             FileKey = fileKey;
             EncryptionDictionary = encryptionDictionary;
+            EncryptMetadata = encryptMetadata;
         }
 
         /// <summary>
@@ -28,6 +29,11 @@ namespace UglyToad.PdfPig.Encryption
         /// The <c>/Encrypt</c> dictionary, which must be written without being encrypted itself.
         /// </summary>
         public DictionaryToken EncryptionDictionary { get; }
+
+        /// <summary>
+        /// Whether the XMP metadata stream is encrypted too.
+        /// </summary>
+        public bool EncryptMetadata { get; }
     }
 
     /// <summary>
@@ -119,7 +125,7 @@ namespace UglyToad.PdfPig.Encryption
                     { NameToken.EncryptMetaData, encryptMetadata ? BooleanToken.True : BooleanToken.False }
                 });
 
-                return new StandardSecurityHandlerResult(fileKey, dictionary);
+                return new StandardSecurityHandlerResult(fileKey, dictionary, encryptMetadata);
             }
         }
 

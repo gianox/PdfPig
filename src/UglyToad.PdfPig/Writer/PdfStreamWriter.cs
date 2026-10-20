@@ -36,6 +36,8 @@
 
         private bool bypassEncryption;
 
+        private IndirectReferenceToken? encryptionReference;
+
         public bool AttemptDeduplication { get; set; } = true;
 
         public bool WritingPageContents
@@ -98,6 +100,26 @@
         }
 
         /// <summary>
+        /// Turns on encryption for everything written from now on. Must be called before the first object is written.
+        /// The encryption dictionary is written without being encrypted and referenced from the trailer.
+        /// </summary>
+        internal void EnableEncryption(StandardSecurityHandlerResult handler)
+        {
+            if (offsets.Count > 0)
+            {
+                throw new InvalidOperationException("Encryption must be configured before any object is written.");
+            }
+
+            if (TokenWriter is not ITrailerTokenWriter)
+            {
+                throw new NotSupportedException("The token writer in use cannot write the /Encrypt entry of the trailer, encryption is only supported with the default token writer.");
+            }
+
+            encryptionReference = WriteUnencryptedToken(handler.EncryptionDictionary);
+            Encryptor = new ObjectEncryptor(handler.FileKey, handler.EncryptMetadata);
+        }
+
+        /// <summary>
         /// Writes a token without encrypting it, used for the encryption dictionary itself.
         /// </summary>
         internal IndirectReferenceToken WriteUnencryptedToken(IToken token)
@@ -141,7 +163,7 @@
         {
             if (TokenWriter is ITrailerTokenWriter trailerWriter)
             {
-                trailerWriter.WriteCrossReferenceTable(offsets, catalogReference.Data, Stream, documentInformationReference?.Data, null, DocumentId);
+                trailerWriter.WriteCrossReferenceTable(offsets, catalogReference.Data, Stream, documentInformationReference?.Data, null, DocumentId, encryptionReference?.Data);
             }
             else
             {

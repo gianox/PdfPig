@@ -151,7 +151,7 @@
             IndirectReference? documentInformationReference,
             long? prevXrefTableLocation)
         {
-            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevXrefTableLocation, DocumentIdentifier.Create());
+            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevXrefTableLocation, DocumentIdentifier.Create(), null);
         }
 
         void ITrailerTokenWriter.WriteCrossReferenceTable(
@@ -160,9 +160,10 @@
             Stream outputStream,
             IndirectReference? documentInformationReference,
             long? prevTableLocation,
-            IReadOnlyList<byte[]> documentId)
+            IReadOnlyList<byte[]> documentId,
+            IndirectReference? encryptionReference)
         {
-            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevTableLocation, documentId);
+            WriteCrossReferenceTable(objectOffsets, catalogToken, outputStream, documentInformationReference, prevTableLocation, documentId, encryptionReference);
         }
 
         private void WriteCrossReferenceTable(
@@ -171,7 +172,8 @@
             Stream outputStream,
             IndirectReference? documentInformationReference,
             long? prevXrefTableLocation,
-            IReadOnlyList<byte[]> documentId)
+            IReadOnlyList<byte[]> documentId,
+            IndirectReference? encryptionReference)
         {
             if (objectOffsets.Count == 0)
             {
@@ -281,6 +283,11 @@
                 {NameToken.Root, new IndirectReferenceToken(catalogToken)},
                 {NameToken.Id, identifier}
             };
+
+            if (encryptionReference.HasValue)
+            {
+                trailerDictionaryData[NameToken.Encrypt] = new IndirectReferenceToken(encryptionReference.Value);
+            }
 
             if (documentInformationReference.HasValue)
             {

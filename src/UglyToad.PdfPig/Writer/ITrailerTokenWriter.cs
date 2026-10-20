@@ -20,12 +20,14 @@ namespace UglyToad.PdfPig.Writer
         /// <param name="documentInformationReference">The document information dictionary if present.</param>
         /// <param name="prevTableLocation">The offset to the previous xref table if present.</param>
         /// <param name="documentId">The two parts of the trailer <c>/ID</c>.</param>
+        /// <param name="encryptionReference">The encryption dictionary if the document is encrypted.</param>
         void WriteCrossReferenceTable(
             IReadOnlyDictionary<IndirectReference, long> objectOffsets,
             IndirectReference catalogToken,
             Stream outputStream,
             IndirectReference? documentInformationReference,
             long? prevTableLocation,
-            IReadOnlyList<byte[]> documentId);
+            IReadOnlyList<byte[]> documentId,
+            IndirectReference? encryptionReference);
     }
 }

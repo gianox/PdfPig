@@ -1458,7 +1458,7 @@ namespace UglyToad.PdfPig.Writer
             /// <summary>
             /// <see cref="DocumentInformation.Producer"/>.
             /// </summary>
-            public string Producer { get; set; } = "PdfPig";
+            public string Producer { get; set; } = "DI-Teknik";
 
             /// <summary>
             /// <see cref="DocumentInformation.CreationDate"/>.

@@ -1,17 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <TargetFrameworks>netstandard2.0;netstandard2.1;net462;net471;net6.0;net8.0;net9.0</TargetFrameworks>
-    <PackageId>PdfPig</PackageId>
+    <PackageId>Gianox.PdfPig</PackageId>
     <DebugType>portable</DebugType>
     <Authors>UglyToad</Authors>
-    <Title>PdfPig</Title>
+    <Title>Gianox.PdfPig</Title>
     <Description>Reads text content from PDF documents and supports document creation. Apache 2.0 licensed.</Description>
     <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
     <PackageProjectUrl>https://github.com/UglyToad/PdfPig</PackageProjectUrl>
     <PackageTags>PDF;Reader;Document;Adobe;PDFBox;PdfPig;pdf-extract;pdf-to-text;pdf;file;text;C#;dotnet;.NET</PackageTags>
     <RepositoryUrl>https://github.com/UglyToad/PdfPig</RepositoryUrl>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>0.1.17</Version>
+    <Version>0.1.17-gianox.1</Version>
     <AssemblyVersion>0.1.17.0</AssemblyVersion>
     <FileVersion>0.1.17.0</FileVersion>
     <PackageIconUrl>https://raw.githubusercontent.com/UglyToad/PdfPig/master/documentation/pdfpig.png</PackageIconUrl>
